@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  langgraph-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: langgraph-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/workspace/notebooks
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
