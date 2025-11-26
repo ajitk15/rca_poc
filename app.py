@@ -1,96 +1,126 @@
+
 import streamlit as st
-from datetime import datetime
+import datetime
 
-st.set_page_config(page_title="IBM MQ RCA Form", layout="centered")
+# --- Custom CSS for chat bubbles ---
+st.markdown("""
+<style>
+.chat-bubble-bot {
+    background-color: #e6f0ff;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 5px;
+    width: fit-content;
+}
+.chat-bubble-user {
+    background-color: #d4f7d4;
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 5px;
+    width: fit-content;
+    margin-left: auto;
+}
+</style>
+""", unsafe_allow_html=True)
 
-st.title("IBM MQ — RCA Form")
+# --- Initialize session state ---
+if 'step' not in st.session_state:
+    st.session_state.step = 1
+if 'responses' not in st.session_state:
+    st.session_state.responses = {}
+if 'history' not in st.session_state:
+    st.session_state.history = []
 
-# 1. Summary
-st.header("1. Summary")
-issue = st.text_input("Issue (one-line)")
-incident_time = st.text_input("Incident Time (YYYY-MM-DD HH:MM)", datetime.now().strftime("%Y-%m-%d %H:%M"))
-severity = st.selectbox("Severity", ["Low", "Medium", "High"])
-environment = st.selectbox("Environment", ["Dev", "QA", "Stage", "Prod"])
+# --- Questions ---
+questions = [
+    ("Issue (One-line summary):", "issue", "Messages stuck in DLQ for CHANNEL.ORDER.INPUT"),
+    ("Incident Time (select date):", "incident_time", datetime.date.today()),
+    ("Severity (Low / Medium / High):", "severity", ["Low", "Medium", "High"]),
+    ("Environment (Dev / QA / Stage / Prod):", "environment", ["Dev", "QA", "Stage", "Prod"]),
+    ("Exact question asked by the engineer:", "user_question", "Why are messages getting into DLQ in MQ queue ORDER.INPUT?"),
+    ("Paste log snippets:", "log_snippets", "AMQ9637: Channel is not available due to SSL error\nAMQ9544: Channel ended abnormally\nMQRC_NOT_AUTHORIZED (2035)"),
+    ("AI Interpretation of logs:", "ai_analysis", "The queue manager is rejecting inbound connections because the SSL certificate on the client channel expired, causing handshake failures."),
+    ("Primary Cause Identified:", "root_cause", "SSL certificate expired on client-connecting channel CHL.ORDER.INPUT"),
+    ("Evidence:", "evidence", "AMQ9637: SSL handshake error – certificate expired\nFDC: SSLCertExpiredProbe\nAMQ9544: Channel terminated abnormally\nDLQ message reason: MQRC_SSL_ERROR (2393)"),
+    ("Impact:", "impact", "Messages stuck in DLQ\nChannel connection failures\nDownstream ACE / DataPower flows impacted\nDuration of disruption\nNumber of messages affected"),
+    ("Recommended Fix:", "recommended_fix", "Renew and install updated SSL certificate for channel.\nRefresh security:\nRestart affected channel(s):\nReprocess DLQ messages using runmqdlq or custom script."),
+    ("Preventive Measures:", "preventive_measures", "Set certificate expiry alerts.\nEnable MQ monitoring for channel status.\nAdd retry/backoff logic in upstream apps.\nPerform periodic SSL & CHL health checks."),
+    ("Confidence Score (Low / Medium / High):", "confidence_score", ["Low", "Medium", "High"]),
+    ("Feedback (✔️ Correct / ❌ Incorrect / 🔄 Partially Correct):", "feedback", ["✔️ Correct", "❌ Incorrect", "🔄 Partially Correct"]),
+    ("Comments:", "comments", "")
+]
 
-# 2. User Question
-st.header("2. User Question")
-user_question = st.text_area("Exact question asked by the engineer")
+# --- Display conversation history ---
+st.title("IBM MQ – RCA Chatbot")
+for msg in st.session_state.history:
+    if msg['sender'] == 'bot':
+        st.markdown(f"<div class='chat-bubble-bot'>🤖 {msg['text']}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='chat-bubble-user'>👤 {msg['text']}</div>", unsafe_allow_html=True)
 
-# 3. Relevant MQ Logs Retrieved
-st.header("3. Relevant MQ Logs Retrieved")
-log_files = st.text_area("List of logs/files retrieved (one per line)", value="AMQERR01\n*.FDC\nchannel.log\napp.log")
-log_snippets = st.text_area("Important log snippets", value="AMQ9637: Channel is not available due to SSL error.\nAMQ9544: Channel ended abnormally.\nMQRC_NOT_AUTHORIZED (2035)")
+# --- Current question ---
+if st.session_state.step <= len(questions):
+    question, key, placeholder = questions[st.session_state.step - 1]
 
-# 4. MQ Analysis
-st.header("4. MQ Analysis (Interpretation)")
-analysis = st.text_area("Analysis / sequence of events")
+    # Show bot question
+    st.markdown(f"<div class='chat-bubble-bot'>🤖 {question}</div>", unsafe_allow_html=True)
 
-# 5. Root Cause
-st.header("5. Root Cause")
-root_cause = st.text_input("Primary Cause Identified")
+    # Input field for answer
+    if isinstance(placeholder, list):
+        answer = st.selectbox("Your answer:", placeholder)
+    elif isinstance(placeholder, datetime.date):
+        answer = st.date_input("Your answer:", placeholder)
+    else:
+        answer = st.text_input("Your answer:", placeholder)
 
-# 6. Evidence
-st.header("6. Evidence (Direct MQ Log References)")
-evidence = st.text_area("List direct log references / FDCs")
+    # Send button
+    if st.button("Send"):
+        st.session_state.responses[key] = answer
+        st.session_state.history.append({'sender': 'bot', 'text': question})
+        st.session_state.history.append({'sender': 'user', 'text': str(answer)})
+        st.session_state.step += 1
+        st.rerun()
+else:
+    st.success("✅ All questions answered! Click below to generate RCA report.")
+    if st.button("Generate RCA Report"):
+        r = st.session_state.responses
+        rca_report = f"""IBM MQ – Root Cause Analysis (RCA) Report
 
-# 7. Impact
-st.header("7. Impact")
-impact_summary = st.text_area("Impact summary (duration, messages affected, downstream impact)")
+1. Summary
+Issue: {r['issue']}
+Incident Time: {r['incident_time']}
+Severity: {r['severity']}
+Environment: {r['environment']}
 
-# 8. Recommended Fix
-st.header("8. Recommended Fix")
-recommended_fix = st.text_area("Recommended immediate remediation steps (ordered with owners)")
+2. User Question
+{r['user_question']}
 
-# 9. Preventive Measures
-st.header("9. Preventive Measures")
-preventive = st.text_area("Preventive measures / monitoring / runbook items")
+3. Relevant MQ Logs
+{r['log_snippets']}
 
-# 10. Confidence Score
-st.header("10. Confidence Score")
-confidence = st.selectbox("Confidence", ["Low", "Medium", "High"])
-confidence_note = st.text_input("Short justification for confidence")
+4. MQ Analysis (AI Interpretation)
+{r['ai_analysis']}
 
-# 11. Engineer Feedback
-st.header("11. Engineer Feedback")
-engineer_feedback = st.text_area("Engineer feedback placeholder")
+5. Root Cause
+{r['root_cause']}
 
-# Generate markdown
-def build_markdown():
-    md = []
-    md.append("# IBM MQ — Root Cause Analysis (RCA)")
-    md.append("\n## 1. Summary")
-    md.append(f"- **Issue:** {issue or '-'}")
-    md.append(f"- **Incident Time:** {incident_time or '-'}")
-    md.append(f"- **Severity:** {severity}")
-    md.append(f"- **Environment:** {environment}")
-    md.append("\n## 2. User Question")
-    md.append(user_question or "-")
-    md.append("\n## 3. Relevant MQ Logs Retrieved")
-    md.append(f"```\n{log_files}\n```")
-    md.append("\n**Important snippets:**")
-    md.append(f"```\n{log_snippets}\n```")
-    md.append("\n## 4. MQ Analysis (Interpretation)")
-    md.append(analysis or "-")
-    md.append("\n## 5. Root Cause")
-    md.append(root_cause or "-")
-    md.append("\n## 6. Evidence (Direct MQ Log References)")
-    md.append(evidence or "-")
-    md.append("\n## 7. Impact")
-    md.append(impact_summary or "-")
-    md.append("\n## 8. Recommended Fix (Immediate)")
-    md.append(recommended_fix or "-")
-    md.append("\n## 9. Preventive Measures")
-    md.append(preventive or "-")
-    md.append("\n## 10. Confidence Score")
-    md.append(f"- **{confidence}** — {confidence_note or '-'}")
-    md.append("\n## 11. Engineer Feedback")
-    md.append(engineer_feedback or "-")
-    return "\n\n".join(md)
+6. Evidence
+{r['evidence']}
 
-md_output = build_markdown()
+7. Impact
+{r['impact']}
 
-st.download_button("Download RCA as Markdown", md_output, file_name="RCA.md", mime="text/markdown")
+8. Recommended Fix
+{r['recommended_fix']}
 
-st.markdown("---")
-st.subheader("Preview (Markdown)")
-st.markdown(md_output)
+9. Preventive Measures
+{r['preventive_measures']}
+
+10. Confidence Score
+{r['confidence_score']}
+
+11. Engineer Feedback
+Feedback: {r['feedback']}
+Comments: {r['comments']}
+"""
+        st.download_button("Download RCA Report", rca_report, file_name="IBM_MQ_RCA_Report.txt")
