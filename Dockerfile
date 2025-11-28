@@ -7,6 +7,8 @@ WORKDIR /workspace
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    wget \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file

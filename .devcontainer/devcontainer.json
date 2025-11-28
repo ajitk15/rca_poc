@@ -3,7 +3,6 @@
   "dockerComposeFile": "../docker-compose.yml",
   "service": "langgraph-dev",
   "workspaceFolder": "/workspace",
-  
   "customizations": {
     "vscode": {
       "extensions": [
@@ -25,16 +24,15 @@
       }
     }
   },
-  
-  "forwardPorts": [8888],
+  "forwardPorts": [
+    8888
+  ],
   "portsAttributes": {
     "8888": {
       "label": "Jupyter Notebook",
       "onAutoForward": "notify"
     }
   },
-  
   "postCreateCommand": "pip list",
-  
   "remoteUser": "root"
 }
