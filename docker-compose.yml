@@ -7,11 +7,17 @@ services:
       dockerfile: Dockerfile
     container_name: rca_poc
     ports:
-      - "8888:8888"
+      - "8888:8888" # Jupyter
+      - "3000:3000" # Node.js app (if needed)
     volumes:
       - .:/workspace # This mounts everything including notebooks
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SPLUNK_HOST=${SPLUNK_HOST}
+      - SPLUNK_PORT=${SPLUNK_PORT}
+      - SPLUNK_USERNAME=${SPLUNK_USERNAME}
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
     stdin_open: true
     tty: true
     restart: unless-stopped
