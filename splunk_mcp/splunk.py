@@ -16,10 +16,10 @@ env_file = script_dir / ".env"
 if env_file.exists():
     load_dotenv(dotenv_path=env_file, override=True)
 else:
-    print(f"❌ .env file not found!")
+    print("❌ .env file not found!")
 
 # Verify what was loaded
-print(f"\n📋 Loaded values:")
+print("\n📋 Loaded values:")
 print(f"   SPLUNK_HOST: {os.getenv('SPLUNK_HOST', 'NOT SET')}")
 print(f"   SPLUNK_PORT: {os.getenv('SPLUNK_PORT', 'NOT SET')}")
 print(f"   SPLUNK_USERNAME: {os.getenv('SPLUNK_USERNAME', 'NOT SET')}")
@@ -142,6 +142,7 @@ async def main():
         }
     )
 
+    # Start MCP server
     server_params = StdioServerParameters(
         command="python",
         args=["/opt/splunk-mcp/splunk_mcp.py", "stdio"],
@@ -154,6 +155,7 @@ async def main():
                 bot = SplunkChatbot()
                 await bot.setup_splunk(read_stream, write_stream, session)
                 await bot.run_chat_loop()
+
     except Exception as e:
         print(f"✗ Connection failed: {e}")
         print(f"\nError details: {type(e).__name__}: {str(e)}")
