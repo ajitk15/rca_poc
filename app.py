@@ -1,126 +1,131 @@
-
 import streamlit as st
-import datetime
 
-# --- Custom CSS for chat bubbles ---
+st.set_page_config(page_title="Change Execution Chatbot", layout="centered")
+
+# -----------------------------
+# CSS for chat bubbles
+# -----------------------------
 st.markdown("""
 <style>
-.chat-bubble-bot {
-    background-color: #e6f0ff;
+.bot {
+    background-color: #eef2ff;
     padding: 10px;
     border-radius: 10px;
-    margin-bottom: 5px;
+    margin: 5px 0;
     width: fit-content;
 }
-.chat-bubble-user {
-    background-color: #d4f7d4;
+.user {
+    background-color: #dcfce7;
     padding: 10px;
     border-radius: 10px;
-    margin-bottom: 5px;
+    margin: 5px 0;
     width: fit-content;
     margin-left: auto;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Initialize session state ---
-if 'step' not in st.session_state:
-    st.session_state.step = 1
-if 'responses' not in st.session_state:
-    st.session_state.responses = {}
-if 'history' not in st.session_state:
+st.title("🤖 Change Execution Chatbot")
+
+# -----------------------------
+# Session State
+# -----------------------------
+if "step" not in st.session_state:
+    st.session_state.step = 0
+if "data" not in st.session_state:
+    st.session_state.data = {}
+if "history" not in st.session_state:
     st.session_state.history = []
 
-# --- Questions ---
-questions = [
-    ("Issue (One-line summary):", "issue", "Messages stuck in DLQ for CHANNEL.ORDER.INPUT"),
-    ("Incident Time (select date):", "incident_time", datetime.date.today()),
-    ("Severity (Low / Medium / High):", "severity", ["Low", "Medium", "High"]),
-    ("Environment (Dev / QA / Stage / Prod):", "environment", ["Dev", "QA", "Stage", "Prod"]),
-    ("Exact question asked by the engineer:", "user_question", "Why are messages getting into DLQ in MQ queue ORDER.INPUT?"),
-    ("Paste log snippets:", "log_snippets", "AMQ9637: Channel is not available due to SSL error\nAMQ9544: Channel ended abnormally\nMQRC_NOT_AUTHORIZED (2035)"),
-    ("AI Interpretation of logs:", "ai_analysis", "The queue manager is rejecting inbound connections because the SSL certificate on the client channel expired, causing handshake failures."),
-    ("Primary Cause Identified:", "root_cause", "SSL certificate expired on client-connecting channel CHL.ORDER.INPUT"),
-    ("Evidence:", "evidence", "AMQ9637: SSL handshake error – certificate expired\nFDC: SSLCertExpiredProbe\nAMQ9544: Channel terminated abnormally\nDLQ message reason: MQRC_SSL_ERROR (2393)"),
-    ("Impact:", "impact", "Messages stuck in DLQ\nChannel connection failures\nDownstream ACE / DataPower flows impacted\nDuration of disruption\nNumber of messages affected"),
-    ("Recommended Fix:", "recommended_fix", "Renew and install updated SSL certificate for channel.\nRefresh security:\nRestart affected channel(s):\nReprocess DLQ messages using runmqdlq or custom script."),
-    ("Preventive Measures:", "preventive_measures", "Set certificate expiry alerts.\nEnable MQ monitoring for channel status.\nAdd retry/backoff logic in upstream apps.\nPerform periodic SSL & CHL health checks."),
-    ("Confidence Score (Low / Medium / High):", "confidence_score", ["Low", "Medium", "High"]),
-    ("Feedback (✔️ Correct / ❌ Incorrect / 🔄 Partially Correct):", "feedback", ["✔️ Correct", "❌ Incorrect", "🔄 Partially Correct"]),
-    ("Comments:", "comments", "")
+# -----------------------------
+# Questions Flow
+# -----------------------------
+BASE_QUESTIONS = [
+    ("Change Number?", "change_number"),
+    ("Requestor ID?", "requestor_id"),
+    ("Approver ID?", "approver_id"),
+    ("What type of change is this? (Script / Stored Procedure / SSIS / Variable ID)", "change_type")
 ]
 
-# --- Display conversation history ---
-st.title("IBM MQ – RCA Chatbot")
+SCRIPT_FLOW = [
+    ("Script Name?", "script_name"),
+    ("Destination Server?", "dest_server"),
+    ("Destination Database?", "dest_db")
+]
+
+SP_FLOW = [
+    ("Source Server?", "source_server"),
+    ("Source Database?", "source_db"),
+    ("Stored Procedure Name?", "sp_name"),
+    ("Destination Server?", "dest_server"),
+    ("Destination Database?", "dest_db")
+]
+
+SSIS_FLOW = [
+    ("Server?", "server"),
+    ("Source Database?", "source_db"),
+    ("SSIS Package Name?", "ssis_name"),
+    ("Destination Server?", "dest_server"),
+    ("Destination Database?", "dest_db")
+]
+
+VAR_FLOW = [
+    ("Environment Variable?", "env_var"),
+    ("Destination Server?", "dest_server"),
+    ("Destination Database?", "dest_db")
+]
+
+# -----------------------------
+# Determine active flow
+# -----------------------------
+def get_active_questions():
+    if st.session_state.step < len(BASE_QUESTIONS):
+        return BASE_QUESTIONS
+
+    change_type = st.session_state.data.get("change_type", "").lower()
+
+    if "script" in change_type:
+        return BASE_QUESTIONS + SCRIPT_FLOW
+    elif "stored" in change_type:
+        return BASE_QUESTIONS + SP_FLOW
+    elif "ssis" in change_type:
+        return BASE_QUESTIONS + SSIS_FLOW
+    elif "variable" in change_type:
+        return BASE_QUESTIONS + VAR_FLOW
+    else:
+        return BASE_QUESTIONS
+
+QUESTIONS = get_active_questions()
+
+# -----------------------------
+# Display chat history
+# -----------------------------
 for msg in st.session_state.history:
-    if msg['sender'] == 'bot':
-        st.markdown(f"<div class='chat-bubble-bot'>🤖 {msg['text']}</div>", unsafe_allow_html=True)
-    else:
-        st.markdown(f"<div class='chat-bubble-user'>👤 {msg['text']}</div>", unsafe_allow_html=True)
+    css = "bot" if msg["sender"] == "bot" else "user"
+    st.markdown(f"<div class='{css}'>{msg['text']}</div>", unsafe_allow_html=True)
 
-# --- Current question ---
-if st.session_state.step <= len(questions):
-    question, key, placeholder = questions[st.session_state.step - 1]
+# -----------------------------
+# Ask next question
+# -----------------------------
+if st.session_state.step < len(QUESTIONS):
+    question, key = QUESTIONS[st.session_state.step]
 
-    # Show bot question
-    st.markdown(f"<div class='chat-bubble-bot'>🤖 {question}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='bot'>{question}</div>", unsafe_allow_html=True)
+    user_input = st.text_input("Your answer", key=f"input_{st.session_state.step}")
 
-    # Input field for answer
-    if isinstance(placeholder, list):
-        answer = st.selectbox("Your answer:", placeholder)
-    elif isinstance(placeholder, datetime.date):
-        answer = st.date_input("Your answer:", placeholder)
-    else:
-        answer = st.text_input("Your answer:", placeholder)
-
-    # Send button
     if st.button("Send"):
-        st.session_state.responses[key] = answer
-        st.session_state.history.append({'sender': 'bot', 'text': question})
-        st.session_state.history.append({'sender': 'user', 'text': str(answer)})
+        st.session_state.data[key] = user_input
+        st.session_state.history.append({"sender": "bot", "text": question})
+        st.session_state.history.append({"sender": "user", "text": user_input})
         st.session_state.step += 1
         st.rerun()
+
+# -----------------------------
+# Summary
+# -----------------------------
 else:
-    st.success("✅ All questions answered! Click below to generate RCA report.")
-    if st.button("Generate RCA Report"):
-        r = st.session_state.responses
-        rca_report = f"""IBM MQ – Root Cause Analysis (RCA) Report
+    st.success("✅ All details collected")
 
-1. Summary
-Issue: {r['issue']}
-Incident Time: {r['incident_time']}
-Severity: {r['severity']}
-Environment: {r['environment']}
-
-2. User Question
-{r['user_question']}
-
-3. Relevant MQ Logs
-{r['log_snippets']}
-
-4. MQ Analysis (AI Interpretation)
-{r['ai_analysis']}
-
-5. Root Cause
-{r['root_cause']}
-
-6. Evidence
-{r['evidence']}
-
-7. Impact
-{r['impact']}
-
-8. Recommended Fix
-{r['recommended_fix']}
-
-9. Preventive Measures
-{r['preventive_measures']}
-
-10. Confidence Score
-{r['confidence_score']}
-
-11. Engineer Feedback
-Feedback: {r['feedback']}
-Comments: {r['comments']}
-"""
-        st.download_button("Download RCA Report", rca_report, file_name="IBM_MQ_RCA_Report.txt")
+    st.subheader("📋 Change Execution Summary")
+    for k, v in st.session_state.data.items():
+        st.write(f"**{k.replace('_', ' ').title()}:** {v}")
