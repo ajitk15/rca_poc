@@ -124,11 +124,11 @@ async def main():
     print("Splunk Chatbot")
     print("=" * 50)
 
-    # Verify environment variables are loaded
-    splunk_host = os.getenv("SPLUNK_HOST")
-    splunk_port = os.getenv("SPLUNK_PORT")
-    splunk_username = os.getenv("SPLUNK_USERNAME")
-    splunk_password = os.getenv("SPLUNK_PASSWORD")
+    # Verify environment variables are loaded (use 'or' to handle empty strings)
+    splunk_host = os.getenv("SPLUNK_HOST") or "localhost"
+    splunk_port = os.getenv("SPLUNK_PORT") or "8089"
+    splunk_username = os.getenv("SPLUNK_USERNAME") or ""
+    splunk_password = os.getenv("SPLUNK_PASSWORD") or ""
 
     subprocess_env = os.environ.copy()
     subprocess_env.update(

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   langgraph-dev:
     build:
@@ -14,10 +12,10 @@ services:
     environment:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - SPLUNK_HOST=${SPLUNK_HOST}
-      - SPLUNK_PORT=${SPLUNK_PORT}
-      - SPLUNK_USERNAME=${SPLUNK_USERNAME}
-      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
+      - SPLUNK_HOST=${SPLUNK_HOST:-localhost}
+      - SPLUNK_PORT=${SPLUNK_PORT:-8089}
+      - SPLUNK_USERNAME=${SPLUNK_USERNAME:-}
+      - SPLUNK_PASSWORD=${SPLUNK_PASSWORD:-}
     stdin_open: true
     tty: true
     restart: unless-stopped
