@@ -1,21 +1,21 @@
 SPLUNK_CONFIG = {
-    "default_index": "main",
-    "common_hosts": ["mqhost01", "webhost01", "apphost01", "dbhost01"],
-    "common_sourcetypes": ["Error", "Access", "Transaction", "Application", "System"],
+    "default_index": "ibmmq",
+    "common_sourcetypes": ["AMQERR", "Access", "Transaction", "Application", "System"],
     "common_sources": [
         "error.log",
         "access.log",
         "transaction.log",
         "application.log",
         "system.log",
+        "amqerr*.log"
     ],
     # Map user-friendly terms to Splunk queries
     "query_templates": {
         "errors": 'source="error.log" sourcetype="Error"',
         "access logs": 'source="access.log" sourcetype="Access"',
         "transactions": 'source="transaction.log" sourcetype="Transaction"',
-        "mq errors": 'source="error.log" host="mqhost01" sourcetype="Error"',
-        "web errors": 'source="error.log" host="webhost01" sourcetype="Error"',
+        "mq errors": 'source="*amqerr*.log" sourcetype="AQERR"',
+        "web errors": 'source="error.log" sourcetype="Error"',
     },
     # Time ranges
     "time_ranges": {
@@ -32,7 +32,7 @@ SPLUNK_CONFIG = {
 def get_system_prompt(tools):
     """Generate system prompt with current Splunk configuration"""
 
-    hosts_str = ", ".join(SPLUNK_CONFIG["common_hosts"])
+    #hosts_str = ", ".join(SPLUNK_CONFIG["common_hosts"])
     sourcetypes_str = ", ".join(SPLUNK_CONFIG["common_sourcetypes"])
     sources_str = ", ".join(SPLUNK_CONFIG["common_sources"])
 
@@ -48,7 +48,6 @@ def get_system_prompt(tools):
 
 Your Splunk environment:
 - Default index: {SPLUNK_CONFIG["default_index"]}
-- Available hosts: {hosts_str}
 - Available sourcetypes: {sourcetypes_str}
 - Available sources: {sources_str}
 
@@ -69,14 +68,27 @@ CRITICAL INSTRUCTIONS:
 3. Infer the most appropriate host/source/sourcetype from context
 4. Always include index="{SPLUNK_CONFIG["default_index"]}" unless user specifies otherwise
 5. Add appropriate time ranges based on user's intent
-6. When you need to execute a Splunk query, respond with JSON:
-   {{"tool": "search" or appropriate tool name, "args": {{"query": "your_complete_splunk_query"}}}}
+6. When you need to execute ANY tool (Splunk or MQ), you MUST respond with ONLY JSON in this exact format:
+   {{"tool": "tool_name", "args": {{"param1": "value1", "param2": "value2"}}}}
+   DO NOT add any explanation before or after the JSON. Just output the JSON.
+7. FALLBACK STRATEGY (CRITICAL):
+   - If a Splunk search returns NO RESULTS or indicates a potential infrastructure issue (e.g. "connection refused", "queue full"), you MUST check the IBM MQ status using the available MQ tools.
+   - Use 'dspmq' to check queue manager status.
+   - Use 'runmqsc' to check specific queue depths if needed.
+   - Combine insights from both Splunk logs and MQ status in your final answer.
+
 
 Example conversations:
 User: "Show me errors from today"
-You: {{"tool": "search", "args": {{"query": "source=\\"error.log\\" sourcetype=\\"Error\\" index=\\"{SPLUNK_CONFIG["default_index"]}\\" earliest=-1d@d"}}}}
+You: {{"tool": "search_splunk", "args": {{"query": "source=\\"error.log\\" sourcetype=\\"Error\\" index=\\"{SPLUNK_CONFIG["default_index"]}\\" earliest=-1d@d"}}}}
 
 User: "What's wrong with the MQ host?"
-You: {{"tool": "search", "args": {{"query": "source=\\"error.log\\" host=\\"mqhost01\\" sourcetype=\\"Error\\" index=\\"{SPLUNK_CONFIG["default_index"]}\\" earliest=-1h"}}}}
+You: {{"tool": "search_splunk", "args": {{"query": "source=\\"error.log\\" host=\\"mqhost01\\" sourcetype=\\"Error\\" index=\\"{SPLUNK_CONFIG["default_index"]}\\" earliest=-1h"}}}}
+
+User: "List all queue managers"
+You: {{"tool": "dspmq", "args": {{}}}}
+
+User: "Show me local queues from QM1 with prefix QL"
+You: {{"tool": "runmqsc", "args": {{"qmgr_name": "QM1", "mqsc_command": "DISPLAY QLOCAL(QL*)"}}}}
 
 Be conversational, helpful, and make Splunk easy to use!"""

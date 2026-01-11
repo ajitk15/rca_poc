@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   langgraph-dev:
     build:
@@ -9,15 +7,30 @@ services:
     ports:
       - "8888:8888" # Jupyter
       - "3000:3000" # Node.js app (if needed)
+      - "8000:8000" # FastMCP API Server
     volumes:
       - .:/workspace # This mounts everything including notebooks
     environment:
+      # Google Gemini API
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+      # Splunk Connection Settings
       - SPLUNK_HOST=${SPLUNK_HOST}
-      - SPLUNK_PORT=${SPLUNK_PORT}
+      - SPLUNK_PORT=${SPLUNK_PORT:-8089}
+      - SPLUNK_SCHEME=${SPLUNK_SCHEME:-https}
       - SPLUNK_USERNAME=${SPLUNK_USERNAME}
       - SPLUNK_PASSWORD=${SPLUNK_PASSWORD}
+      - SPLUNK_TOKEN=${SPLUNK_TOKEN:-}
+      - VERIFY_SSL=${VERIFY_SSL:-true}
+
+      # FastMCP Server Settings
+      - FASTMCP_PORT=${FASTMCP_PORT:-8000}
     stdin_open: true
     tty: true
     restart: unless-stopped
+    networks:
+      - rca_network
+
+networks:
+  rca_network:
+    driver: bridge
